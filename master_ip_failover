@@ -1,0 +1,94 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings FATAL => 'all';
+
+use Getopt::Long;
+use MHA::DBHelper;
+
+my (
+    $command, $ssh_user, $orig_master_host, $orig_master_ip,$orig_master_port, 
+    $new_master_host, $new_master_ip, $new_master_port,$new_master_user,$new_master_password,
+);
+my $vip = '192.168.244.100';
+my $gateway = '192.168.244.2';
+my $interface = 'eno16777736';
+my $key = "0";
+my $ssh_start_vip = "/sbin/ifconfig $interface:$key $vip netmask 255.255.255.0 ;/sbin/arping -I $interface -c 3 -s $vip $gateway >/dev/null 2>&1";
+my $ssh_stop_vip = "/sbin/ifconfig $interface:$key down";
+GetOptions(
+    'command=s' => \$command,
+    'ssh_user=s' => \$ssh_user,
+    'orig_master_host=s' => \$orig_master_host,
+    'orig_master_ip=s' => \$orig_master_ip,
+    'orig_master_port=i' => \$orig_master_port,
+    'new_master_host=s' => \$new_master_host,
+    'new_master_ip=s' => \$new_master_ip,
+    'new_master_port=i' => \$new_master_port,
+    'new_master_user=s'        => \$new_master_user,
+    'new_master_password=s'    => \$new_master_password,
+);
+exit &main();
+sub main {
+    print "\n\nIN SCRIPT TEST====$ssh_stop_vip==$ssh_start_vip===\n\n";
+    if ( $command eq "stop" || $command eq "stopssh" ) {
+        my $exit_code = 1;
+        eval {
+            print "Disabling the VIP on old master: $orig_master_host \n";
+            &stop_vip();
+            $exit_code = 0;
+        };
+        if ($@) {
+            warn "Got Error: $@\n";
+            exit $exit_code;
+        }
+        exit $exit_code;
+    }
+    elsif ( $command eq "start" ) {
+        my $exit_code = 10;
+        eval {
+            my $new_master_handler = new MHA::DBHelper();
+            $new_master_handler->connect($new_master_ip,$new_master_port,$new_master_user,$new_master_password,1);
+	    if ( $new_master_handler->is_read_only() ) {
+            	$new_master_handler->disable_log_bin_local();
+	    	print "Set read_only=0 on the new master.\n";
+	    	$new_master_handler->disable_read_only();
+            	$new_master_handler->enable_log_bin_local();
+ 	    }
+	    else {
+	    	print "The new master had set read_only=0.\n"
+	    }
+	    $new_master_handler->disconnect();
+
+            print "Enabling the VIP - $vip on the new master - $new_master_host \n";
+            &start_vip();
+
+            $exit_code = 0;
+        };
+        if ($@) {
+            warn $@;
+            exit $exit_code;
+        }
+        exit $exit_code;
+    }
+    elsif ( $command eq "status" ) {
+        print "Checking the Status of the script.. OK \n";
+       `ssh   $ssh_user\@$orig_master_host \" $ssh_start_vip \"`;    
+    exit 0;
+    }
+    else {
+        &usage();
+        exit 1;
+    }
+}
+sub start_vip() {
+    `ssh   $ssh_user\@$new_master_host \" $ssh_start_vip \"`;
+}
+sub stop_vip() {
+     `ssh $ssh_user\@$orig_master_host \" $ssh_stop_vip \"`;
+}
+sub usage {
+    print
+    "Usage: master_ip_failover --command=start|stop|stopssh|status --orig_master_host=host --orig_master_ip=ip --orig_master_port=port --new_master_host=host --new_master_ip=ip --new_master_p
+ort=port\n";
+}

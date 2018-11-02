@@ -1,0 +1,21 @@
+[server default]
+manager_log=/mha/manager.log
+manager_workdir=/mha
+master_binlog_dir=/mysql/log/3306/binlog/
+master_ip_failover_script=/usr/local/bin/master_ip_failover
+password=123456
+ping_interval=1
+remote_workdir=/mha
+repl_password=123
+repl_user=slave
+secondary_check_script=masterha_secondary_check  -s 192.168.244.130 -s 192.168.244.132 -s 192.168.244.133
+ssh_user=root
+user=mha
+
+[server2]
+candidate_master=1
+hostname=192.168.244.132
+
+[server3]
+hostname=192.168.244.133
+no_master=1
