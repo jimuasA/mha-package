@@ -6,6 +6,19 @@
 192.168.244.134		monitor
 
 #主从
+
+[mysqld]
+server_id = 1
+log-slave-updates
+log_bin_trust_function_creators = 1
+binlog_format=mixed
+log_bin=/mysql/log/3306/binlog/itpuxdb-binlog
+log_bin_index=/mysql/log/3306/binlog/itpuxdb-binlog.index
+binlog_rows_query_log_events=on
+innodb_flush_log_at_trx_commit=1
+sync_binlog=1
+
+
 update mysql.user set authentication_string=password('qqqqqq') where user='root' ;
 set password = password('123456');
 
